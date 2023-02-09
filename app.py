@@ -6,6 +6,8 @@ from tensorflow import keras
 from tensorflow.keras.models import load_model
 import numpy as np
 from flask_cors import CORS, cross_origin
+from PIL import Image
+import io
 
 app = Flask(__name__)
 cors = CORS(app)
@@ -18,31 +20,41 @@ model.make_predict_function()
 @cross_origin()
 def main():
     return 'Welcome to TB Lab API'
-    
+
+def prepare_image(img):
+    img = Image.open(io.BytesIO(img))
+    img = img.resize((224, 224))
+    img = np.array(img)
+    img = np.expand_dims(img, 0)
+    return img
+
+def predict_result(img):
+    pred = np.argmax(model.predict(img))
+
+    if pred==0:
+        return 'NORMAL'
+    elif pred==1:
+        return 'TUBERCULOSIS'
+ 
+def predict_percentage(img):
+    predict_proba = sorted(model.predict(img)[0])[1]
+    return round(predict_proba*100,2),
+
 @app.route('/', methods=['POST'])
 @cross_origin()
 def predict():
-    imagefile = request.files['imagefile']
-    image_path = "./static/" + imagefile.filename
-    imagefile.save(image_path)
+    if 'imagefile' not in request.files:
+        return "Please try again. The Image doesn't exist"
+    
+    imagefile = request.files.get('imagefile')
 
-    im = load_img(image_path, target_size=(224,224))
-    im_array = np.asarray(im)
-    im_array = im_array*(1/224)
-    im_input = tf.reshape(im_array, shape = [1, 224, 224, 3])
+    if not imagefile:
+        return
 
-    pred = np.argmax(model.predict(im_input))
-    predict_proba = sorted(model.predict(im_input)[0])[1]
-    if pred==0:
-        desc = 'NORMAL'
-    elif pred==1:
-        desc = 'TUBERCULOSIS'
+    img_bytes = imagefile.read()
+    img = prepare_image(img_bytes)
 
-    classification = '%s' % (desc)
-    percentage = '%s' % (np.round(predict_proba*100,2))
-
-    return jsonify({'prediction': classification,
-                    'probability': percentage})
+    return jsonify(prediction=predict_result(img), probability=predict_percentage(img)[0])
 
 if __name__ == '__main__':
     app.run(port=3000, debug=True)
