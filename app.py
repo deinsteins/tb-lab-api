@@ -24,9 +24,9 @@ def main():
 @app.route('/', methods=['POST'])
 @cross_origin()
 def predict():
-    
+
     imagefile = request.files['imagefile']
-    image_path = "./static/" + imagefile.filename
+    image_path = "./tmp/" + imagefile.filename
     imagefile.save(image_path)
 
     im = load_img(image_path, target_size=(224,224))
